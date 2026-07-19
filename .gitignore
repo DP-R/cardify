@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+uploads/*
+!uploads/.gitkeep
+outputs/*
+!outputs/.gitkeep
+static/previews/*
+!static/previews/.gitkeep
+extracted_*
+.env
+.venv
