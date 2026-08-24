@@ -1,12 +1,13 @@
 @echo off
 echo Installing required packages...
-pip install pyinstaller flaskwebgui
+python -m pip install pyinstaller flaskwebgui
 
 echo Cleaning old builds...
-rmdir /s /q build dist
+if exist build rmdir /s /q build
+if exist dist rmdir /s /q dist
 
 echo Building standalone application using PyInstaller...
-pyinstaller --name "Cardify" ^
+python -m PyInstaller --name "Cardify" ^
     --onedir ^
     --noconsole ^
     --add-data "templates;templates" ^
