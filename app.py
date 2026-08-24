@@ -1,3 +1,7 @@
+import os, sys
+if getattr(sys, "frozen", False):
+    os.chdir(os.path.dirname(sys.executable))
+
 import os
 import fitz
 from flask import Flask, render_template, request, send_file, jsonify
@@ -104,7 +108,7 @@ def convert_pdf():
         })
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        import traceback; traceback.print_exc(); return jsonify({"error": str(e)}), 500
 
 
 @app.route('/download/<filename>')
@@ -116,5 +120,11 @@ def download_file(filename):
 
 
 if __name__ == '__main__':
-    print("Starting Card Converter Web App server on http://localhost:5000")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    import os
+    if os.environ.get("FLASK_SERVER_ONLY") == "1":
+        print("Starting Card Converter Web App server on http://localhost:5000")
+        app.run(host='0.0.0.0', port=5000, debug=True)
+    else:
+        from flaskwebgui import FlaskUI
+        print("Starting Card Converter Desktop App...")
+        FlaskUI(app=app, server="flask", port=5000, width=1200, height=800).run()

@@ -17,94 +17,86 @@ def parse_rc_a4(pdf_path="a4.pdf"):
     text = ""
     for page in doc:
         text += page.get_text() + "\n"
-    
-    data = {}
-    m = re.search(r"Registered Owner\s*:\s*(.+)", text)
-    data["owner_name"] = m.group(1).strip() if m else "NEKKANTI NAGESWARA RAO"
-    
-    m = re.search(r"Registration Number\s*:\s*(.+)", text)
-    data["reg_no"] = m.group(1).strip() if m else "AP39BY4669"
-    
-    m = re.search(r"D/o or S/o or W/o or\s*Rep\s*:\s*(.+)", text)
-    data["swd_of"] = m.group(1).strip() if m else "S/O NEKKANTI VENKATESWARA RAO"
-    
-    m = re.search(r"Date Of Registration\s*:\s*(.+)", text)
-    data["reg_date"] = m.group(1).strip() if m else "04-09-2019"
-    
-    m = re.search(r"Owner Type\s*:\s*(.+)", text)
-    data["owner_type"] = m.group(1).strip() if m else "INDIVIDUAL"
-    
-    m = re.search(r"Registration Valid Upto\s*:\s*(.+)", text)
-    data["valid_upto"] = m.group(1).strip() if m else "03-09-2034"
-    
-    m = re.search(r"Present Address\s*:\s*([\s\S]+?)(?=Hypothecated|Date Of Registration|Tax Paid)", text)
-    if m:
-        addr = m.group(1).replace("\n", " ").strip()
-        addr = re.sub(r"\s+", " ", addr)
-        data["address"] = addr
-    else:
-        data["address"] = "9-15 BRAHMIN STREET,PENUGONDA VADALI,PENUGONDA,WEST GODAVARI ANDHRA PRADESH 534324"
         
-    m = re.search(r"Chassis Number\s*:\s*(.+)", text)
-    data["chassis_no"] = m.group(1).strip() if m else "MD2B37AY6KWD26878"
-    
-    m = re.search(r"Engine Number\s*:\s*(.+)", text)
-    data["engine_no"] = m.group(1).strip() if m else "PFYWKD03419"
-    
-    m = re.search(r"Vehicle Class\s*:\s*(.+)", text)
-    data["vehicle_class"] = m.group(1).strip() if m else "MOTOR CYCLE"
-    
-    m = re.search(r"Body Type\s*:\s*(.+)", text)
-    data["body_type"] = m.group(1).strip() if m else "SOLO WITH PILLION"
-    
-    m = re.search(r"Colour\s*:\s*(.+)", text)
-    data["colour"] = m.group(1).strip() if m else "EBONY BLK BLUE DKL"
-    
-    m = re.search(r"Fuel Used\s*:\s*(.+)", text)
-    data["fuel"] = m.group(1).strip() if m else "PETROL"
-    
-    m = re.search(r"Makers Name\s*:\s*(.+)", text)
-    data["maker_name"] = m.group(1).strip() if m else "BAJAJ AUTO LTD"
-    
-    m = re.search(r"Maker's\s*Classification\s*:\s*(.+)", text)
-    data["model_name"] = m.group(1).strip() if m else "CT 110"
-    
-    m = re.search(r"Mth\.Yr\.of Mfg\(mmyyyy\)\s*:\s*(.+)", text)
-    if m:
-        mfg = m.group(1).strip()
-        if len(mfg) == 6:
-            data["mfg_date"] = f"{mfg[:2]}-{mfg[2:]}"
+    def get_field(label, next_label=None, default=""):
+        # 1. Try colon format: "Label : Value"
+        m = re.search(fr"{label}\s*:\s*([^\n]+)", text)
+        if m:
+            return m.group(1).strip()
+            
+        # 2. Try newline format
+        if next_label:
+            m = re.search(fr"{label}\s*\n(.*?)\s*(?:{next_label})", text, re.DOTALL)
+            if m:
+                val = m.group(1).strip()
+                val = re.sub(r'\s+', ' ', val)
+                return val
         else:
-            data["mfg_date"] = mfg
-    else:
-        data["mfg_date"] = "07-2019"
+            m = re.search(fr"{label}\s*\n([^\n]+)", text)
+            if m:
+                return m.group(1).strip()
+                
+        return default
+
+    data = {}
+    data["reg_no"] = get_field("Registration Number", "Registered Owner", "")
+    data["owner_name"] = get_field("Registered Owner", r"D/o or S/o or W/o or", "")
+    data["swd_of"] = get_field(r"D/o or S/o or W/o or\s*\n*Rep", "Present Address")
+    if not data["swd_of"]:
+        data["swd_of"] = get_field(r"D/o or S/o or W/o or\s*Rep", None, "")
         
-    m = re.search(r"Unladen Weight\s*:\s*(.+)", text)
-    data["unladen_wt"] = m.group(1).replace("Kgs", "").strip() if m else "116"
+    data["address"] = get_field("Present Address", "Date Of Registration", "")
+    data["reg_date"] = get_field("Date Of Registration", r"VEHICLE DETAILED DESCRIPTION|Vehicle Class", "")
     
-    m = re.search(r"GVW\s*:\s*(.+)", text)
-    data["laden_wt"] = m.group(1).replace("Kgs", "").strip() if m else "246"
+    data["vehicle_class"] = get_field("Vehicle Class", "Makers Name", "")
+    data["maker_name"] = get_field("Makers Name", "Body Type", "")
+    data["body_type"] = get_field("Body Type", r"Mth\.Yr\.of Mfg", "")
     
-    m = re.search(r"Engine Power\s*:\s*(.+)", text)
-    data["hp"] = m.group(1).strip() if m else "6.33"
+    mfg = get_field(r"Mth\.Yr\.of Mfg\(mmyyyy\)", r"No\. of Cylinder")
+    if mfg and len(mfg.replace(" ","")) == 6:
+        mfg = mfg.replace(" ","")
+        data["mfg_date"] = f"{mfg[:2]}-{mfg[2:]}"
+    else:
+        data["mfg_date"] = mfg if mfg else ""
+        
+    data["cylinders"] = get_field(r"No\. of Cylinder", "Chassis Number", "")
+    data["chassis_no"] = get_field("Chassis Number", "Engine Number", "")
+    data["engine_no"] = get_field("Engine Number", "Fuel Used", "")
+    data["fuel"] = get_field("Fuel Used", "Engine Power", "")
+    data["hp"] = get_field("Engine Power", "Cubic Capacity", "")
+    data["cc"] = get_field("Cubic Capacity", r"Maker's", "")
     
-    m = re.search(r"Cubic Capacity\s*:\s*(.+)", text)
-    data["cc"] = m.group(1).strip() if m else "115.45"
+    data["model_name"] = get_field(r"Maker's\s*\n*Classification", "Wheel Base")
+    if not data["model_name"]:
+        data["model_name"] = get_field(r"Maker's Classification", None, "")
+        
+    data["wheelbase"] = get_field("Wheel Base", "Seating Capacity", "")
+    data["seating"] = get_field("Seating Capacity", "Unladen Weight", "")
     
-    m = re.search(r"No\. of Cylinder\s*:\s*(.+)", text)
-    data["cylinders"] = m.group(1).strip() if m else "1"
+    unladen = get_field("Unladen Weight", "Colour")
+    data["unladen_wt"] = unladen.replace("Kgs", "").replace("kgs", "").strip() if unladen else ""
     
-    m = re.search(r"Seating Capacity\s*:\s*(.+)", text)
-    data["seating"] = m.group(1).strip() if m else "2"
+    data["colour"] = get_field("Colour", "GVW", "")
     
-    m = re.search(r"Wheel Base\s*:\s*(.+)", text)
-    data["wheelbase"] = m.group(1).strip() if m else "1235"
+    gvw = get_field("GVW", r"VEHICLE TYRE|Registration Valid")
+    if not gvw:
+        gvw = get_field("GVW", None)
+    data["laden_wt"] = gvw.replace("Kgs", "").replace("kgs", "").strip() if gvw else ""
     
-    data["authority"] = "UNIT OFFICE TANUKU"
+    data["valid_upto"] = get_field("Registration Valid Upto", "Registering Authority", "")
     
-    m = re.search(r"Transaction Date\s*:\s*(.+)", text)
-    data["tx_date"] = m.group(1).strip() if m else "29-04-2023"
+    auth = get_field("Registering Authority", "Owner Type", "")
+    if "Description" in auth or "Weights" in auth:
+        auth = re.sub(r'Description.*?Weights\s*', '', auth).strip()
+    data["authority"] = auth
     
+    data["owner_type"] = get_field("Owner Type", "Invoice Amount", "")
+    
+    tx = get_field("Transaction Date", "Visit Url", "")
+    if tx and tx.startswith(":"):
+        tx = tx[1:].strip()
+    data["tx_date"] = tx
+
     # Extract QR Code
     qr_path = "extracted_rc_qr.png"
     for page in doc:
@@ -112,8 +104,19 @@ def parse_rc_a4(pdf_path="a4.pdf"):
             xref = img_info[0]
             base_img = doc.extract_image(xref)
             if base_img["width"] == 200 and base_img["height"] == 200 and len(base_img["image"]) > 1000:
-                with open(qr_path, "wb") as f:
-                    f.write(base_img["image"])
+                try:
+                    import io
+                    from PIL import Image, ImageChops
+                    im = Image.open(io.BytesIO(base_img["image"]))
+                    bg = Image.new(im.mode, im.size, (255,255,255))
+                    diff = ImageChops.difference(im, bg)
+                    bbox = diff.getbbox()
+                    if bbox:
+                        im = im.crop(bbox)
+                    im.save(qr_path)
+                except Exception:
+                    with open(qr_path, "wb") as f:
+                        f.write(base_img["image"])
                 break
                 
     data["qr_path"] = qr_path
@@ -259,8 +262,8 @@ def generate_rc_card(rc_data, output_path="a4_converted_card.pdf"):
     # Form 23A vertical (rotate=90)
     page2.insert_text((253.33, 107.54), "Form 23A", fontname="helv", fontsize=5.8, color=(0,0,0), rotate=90)
     
-    page2.insert_text((202.35, 129.54), "Registration Authority", fontname="helv", fontsize=5.8, color=(0,0,0))
-    page2.insert_text((202.35, 136.95), rc_data["authority"], fontname="helv", fontsize=5.8, color=(0,0,0))
+    page2.insert_textbox(fitz.Rect(180.0, 124.0, 255.0, 133.0), "Registration Authority", fontname="helv", fontsize=5.8, color=(0,0,0), align=fitz.TEXT_ALIGN_RIGHT)
+    page2.insert_textbox(fitz.Rect(180.0, 133.0, 255.0, 148.0), rc_data["authority"], fontname="helv", fontsize=5.8, color=(0,0,0), align=fitz.TEXT_ALIGN_RIGHT)
     
     doc.save(output_path)
     print(f"Successfully generated RC Card PDF: {output_path}")

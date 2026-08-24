@@ -20,16 +20,16 @@ def parse_dl_a4(pdf_path="dl_a4.pdf"):
         
     data = {}
     m = re.search(r"Driving Licence Number\s*:\s*(.+)", text)
-    data["dl_no"] = m.group(1).strip() if m else "AP53700312752019"
+    data["dl_no"] = m.group(1).strip() if m else ""
     
     m = re.search(r"Name\s*:\s*(.+)", text)
-    data["name"] = m.group(1).strip() if m else "T PHANIMADHUSUDHAN"
+    data["name"] = m.group(1).strip() if m else ""
     
     m = re.search(r"Son/Wife/Daughter of\s*:\s*(.+)", text)
-    data["swd_of"] = m.group(1).strip() if m else "S/O Naga Satya Srinivasarao"
+    data["swd_of"] = m.group(1).strip() if m else ""
     
     m = re.search(r"Date of Birth\s*:\s*(.+)", text)
-    data["dob"] = m.group(1).strip() if m else "04-10-1995"
+    data["dob"] = m.group(1).strip() if m else ""
     
     m = re.search(r"Present Address\s*:\s*([\s\S]+?)(?=Issue Date|Date of Validity|NATIONALITY)", text)
     if m:
@@ -37,24 +37,24 @@ def parse_dl_a4(pdf_path="dl_a4.pdf"):
         addr = re.sub(r"\s+", " ", addr)
         data["address"] = addr
     else:
-        data["address"] = "9-43/3 VENKATESWARA TEMPLE ST,MARTERU MARTERU,PENUMANTRA, WEST GODAVARI, ANDHRA PRADESH PIN-534122."
+        data["address"] = ""
         
     m = re.search(r"Issue Date\s*:\s*(.+)", text)
-    data["issue_date"] = m.group(1).strip() if m else "12-08-2022"
+    data["issue_date"] = m.group(1).strip() if m else ""
     
     m = re.search(r"Date of Validity\s*:\s*(.+)", text)
-    data["validity_nt"] = m.group(1).strip() if m else "07-04-2039"
+    data["validity_nt"] = m.group(1).strip() if m else ""
     
     m = re.search(r"Date of first Issue\s*:\s*(.+)", text)
-    data["first_issue"] = m.group(1).strip() if m else "08-04-2019"
+    data["first_issue"] = m.group(1).strip() if m else ""
     
     m = re.search(r"Orginal LA\.\s*:\s*(.+)", text)
-    data["original_la"] = m.group(1).strip() if m else "AP537"
+    data["original_la"] = m.group(1).strip() if m else ""
     
     m = re.search(r"Blood Group\s*:\s*(.*)", text)
     data["blood_group"] = m.group(1).strip() if m else ""
     
-    data["authority"] = "UNIT OFFICE TANUKU"
+    data["authority"] = ""
     
     photo_path = "extracted_dl_photo.jpeg"
     qr_path = "extracted_dl_qr.png"
@@ -67,8 +67,19 @@ def parse_dl_a4(pdf_path="dl_a4.pdf"):
                 with open(photo_path, "wb") as f:
                     f.write(base_img["image"])
             elif base_img["width"] == 200 and base_img["height"] == 200 and len(base_img["image"]) > 1000:
-                with open(qr_path, "wb") as f:
-                    f.write(base_img["image"])
+                try:
+                    import io
+                    from PIL import Image, ImageChops
+                    im = Image.open(io.BytesIO(base_img["image"]))
+                    bg = Image.new(im.mode, im.size, (255,255,255))
+                    diff = ImageChops.difference(im, bg)
+                    bbox = diff.getbbox()
+                    if bbox:
+                        im = im.crop(bbox)
+                    im.save(qr_path)
+                except Exception:
+                    with open(qr_path, "wb") as f:
+                        f.write(base_img["image"])
                     
     data["photo_path"] = photo_path
     data["qr_path"] = qr_path
